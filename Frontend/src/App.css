@@ -1,21 +1,16 @@
-.counter {
-  font-size: 16px;
-  padding: 5px 10px;
-  border-radius: 5px;
-  color: var(--accent);
-  background: var(--accent-bg);
-  border: 2px solid transparent;
-  transition: border-color 0.3s;
-  margin-bottom: 24px;
+/* App specific styles */
 
-  &:hover {
-    border-color: var(--accent-border);
-  }
-  &:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: 2px;
-  }
+#root {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
 }
+
+/* Ensure smooth animations */
+* {
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
 
 .hero {
   position: relative;
