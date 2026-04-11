@@ -2,13 +2,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import sys
+import logging
 from pathlib import Path
 
-# Add project root and backend path to sys.path for flexible startup
-backend_dir = Path(__file__).resolve().parent
-project_root = backend_dir.parent
-sys.path.insert(0, str(project_root))
-sys.path.insert(0, str(backend_dir))
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 try:
     from Backend.api.routes.analytics import router, initialize_services_api
@@ -38,8 +37,13 @@ app.include_router(router)
 @app.on_event("startup")
 async def startup_event():
     """Initialize all services"""
-    initialize_services_api()
-    print("✓ Analytics services initialized")
+    try:
+        initialize_services_api()
+        logger.info("✓ Analytics services initialized successfully")
+        print("✓ Analytics services initialized")
+    except Exception as e:
+        logger.error(f"Failed to initialize services: {e}")
+        raise
 
 
 @app.on_event("shutdown")

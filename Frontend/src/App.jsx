@@ -19,8 +19,10 @@ function App() {
   useEffect(() => {
     // Check if backend is available
     const checkConnection = async () => {
+      console.log('Checking backend connection...');
       try {
         await healthCheck();
+        console.log('Backend connection successful');
         setConnected(true);
         setError(null);
       } catch (error) {

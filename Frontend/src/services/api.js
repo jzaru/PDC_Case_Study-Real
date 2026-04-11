@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://localhost:8001/api';
+const API_BASE_URL = 'http://localhost:8000/api';
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
@@ -12,8 +12,7 @@ const apiClient = axios.create({
 // ============ HEALTH CHECK ============
 export const healthCheck = async () => {
   try {
-    // Check root endpoint for basic connectivity
-    const response = await axios.get('http://localhost:8001/');
+    const response = await apiClient.get('/health');
     return response.data;
   } catch (error) {
     console.error('Health check failed:', error);
@@ -133,47 +132,22 @@ export const logisticsApi = {
   },
 };
 
-// ============ STOCK API (Mock for compatibility) ============
+// ============ STOCK API ============
 export const stockApi = {
   getAllStocks: async () => {
     try {
-      // Mock stock data
-      return [
-        { symbol: 'AAPL', name: 'Apple Inc.', price: 150.25, change: 2.5 },
-        { symbol: 'GOOGL', name: 'Alphabet Inc.', price: 2800.00, change: -1.2 },
-        { symbol: 'MSFT', name: 'Microsoft Corp.', price: 305.50, change: 0.8 },
-        { symbol: 'TSLA', name: 'Tesla Inc.', price: 220.75, change: 5.3 },
-        { symbol: 'AMZN', name: 'Amazon.com Inc.', price: 3200.00, change: -0.5 }
-      ];
+      const response = await apiClient.get('/stocks');
+      return response.data;
     } catch (error) {
       console.error('Error fetching stocks:', error);
       throw error;
     }
   },
 
-  getPortfolio: async (userId) => {
-    try {
-      const response = await apiClient.get('/portfolio', {
-        params: { user_id: userId }
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Error fetching portfolio:', error);
-      throw error;
-    }
-  },
-
   getStockAnalysis: async (symbol) => {
     try {
-      // Mock analysis data
-      const analyses = {
-        'AAPL': { current_price: 150.25, recommendation: 'BUY', confidence: 0.85 },
-        'GOOGL': { current_price: 2800.00, recommendation: 'HOLD', confidence: 0.65 },
-        'MSFT': { current_price: 305.50, recommendation: 'BUY', confidence: 0.78 },
-        'TSLA': { current_price: 220.75, recommendation: 'SELL', confidence: 0.72 },
-        'AMZN': { current_price: 3200.00, recommendation: 'BUY', confidence: 0.81 }
-      };
-      return analyses[symbol] || { current_price: 100.00, recommendation: 'HOLD', confidence: 0.5 };
+      const response = await apiClient.get(`/stocks/${symbol}/analysis`);
+      return response.data;
     } catch (error) {
       console.error('Error fetching stock analysis:', error);
       throw error;
@@ -182,14 +156,8 @@ export const stockApi = {
 
   getStockHistory: async (symbol) => {
     try {
-      // Mock history data with close/open format for chart
-      return {
-        history: [
-          { date: '2024-01-01', close: 145.00, open: 144.50 },
-          { date: '2024-01-02', close: 147.50, open: 145.20 },
-          { date: '2024-01-03', close: 150.25, open: 147.80 }
-        ]
-      };
+      const response = await apiClient.get(`/stocks/${symbol}/history`);
+      return response.data;
     } catch (error) {
       console.error('Error fetching stock history:', error);
       throw error;
@@ -197,7 +165,7 @@ export const stockApi = {
   }
 };
 
-// ============ PORTFOLIO API (Mock for compatibility) ============
+// ============ PORTFOLIO API ============
 export const portfolioApi = {
   getPortfolio: async (userId) => {
     try {
@@ -213,11 +181,10 @@ export const portfolioApi = {
 
   getTransactions: async (userId) => {
     try {
-      // Mock transactions data
-      return [
-        { id: 1, symbol: 'AAPL', type: 'BUY', shares: 10, price: 145.00, date: '2024-01-01' },
-        { id: 2, symbol: 'GOOGL', type: 'SELL', shares: 2, price: 2750.00, date: '2024-01-02' }
-      ];
+      const response = await apiClient.get('/transactions', {
+        params: { user_id: userId }
+      });
+      return response.data;
     } catch (error) {
       console.error('Error fetching transactions:', error);
       throw error;
@@ -226,8 +193,12 @@ export const portfolioApi = {
 
   buyStock: async (userId, symbol, quantity) => {
     try {
-      // Mock successful buy
-      return { success: true, message: 'Stock purchased successfully' };
+      const response = await apiClient.post('/portfolio/buy', {
+        user_id: userId,
+        symbol,
+        quantity
+      });
+      return response.data;
     } catch (error) {
       console.error('Error buying stock:', error);
       throw error;
@@ -236,8 +207,12 @@ export const portfolioApi = {
 
   sellStock: async (userId, symbol, quantity) => {
     try {
-      // Mock successful sell
-      return { success: true, message: 'Stock sold successfully' };
+      const response = await apiClient.post('/portfolio/sell', {
+        user_id: userId,
+        symbol,
+        quantity
+      });
+      return response.data;
     } catch (error) {
       console.error('Error selling stock:', error);
       throw error;
