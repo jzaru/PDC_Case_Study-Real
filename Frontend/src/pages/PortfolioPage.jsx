@@ -13,13 +13,15 @@ export default function PortfolioPage({ userId }) {
   }, [userId]);
 
   const fetchPortfolio = async () => {
+    console.log('PortfolioPage: Fetching portfolio...');
     try {
       const data = await portfolioApi.getPortfolio(userId);
+      console.log('PortfolioPage: Portfolio fetched', data);
       setPortfolio(data);
       setError(null);
     } catch (err) {
+      console.error('PortfolioPage: Fetch error:', err);
       setError('Failed to fetch portfolio');
-      console.error(err);
     } finally {
       setLoading(false);
     }

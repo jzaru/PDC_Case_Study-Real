@@ -35,6 +35,7 @@ export default function BuySellPage({ selectedSymbol, userId }) {
   };
 
   const fetchData = async () => {
+    console.log('BuySellPage: Fetching data for', symbol);
     setLoading(true);
     try {
       const [analysisData, historyData, portfolioData] = await Promise.all([
@@ -42,11 +43,12 @@ export default function BuySellPage({ selectedSymbol, userId }) {
         stockApi.getStockHistory(symbol),
         portfolioApi.getPortfolio(userId),
       ]);
+      console.log('BuySellPage: Data fetched', { analysisData, historyData, portfolioData });
       setAnalysis(analysisData);
       setHistory(historyData.history || []);
       setPortfolio(portfolioData);
     } catch (error) {
-      console.error('Error fetching data:', error);
+      console.error('BuySellPage: Error fetching data:', error);
       setMessage({ type: 'error', text: 'Failed to load data' });
     } finally {
       setLoading(false);

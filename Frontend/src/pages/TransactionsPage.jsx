@@ -13,13 +13,15 @@ export default function TransactionsPage({ userId }) {
   }, [userId]);
 
   const fetchTransactions = async () => {
+    console.log('TransactionsPage: Fetching transactions...');
     try {
       const data = await portfolioApi.getTransactions(userId, 100);
+      console.log('TransactionsPage: Transactions fetched', data);
       setTransactions(data.transactions || []);
       setError(null);
     } catch (err) {
+      console.error('TransactionsPage: Fetch error:', err);
       setError('Failed to fetch transactions');
-      console.error(err);
     } finally {
       setLoading(false);
     }
