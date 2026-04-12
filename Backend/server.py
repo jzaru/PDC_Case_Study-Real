@@ -10,14 +10,14 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 try:
-    from Backend.api.routes.analytics import router, initialize_services_api
-except ModuleNotFoundError:
     from api.routes.analytics import router, initialize_services_api
+except ModuleNotFoundError:
+    from .api.routes.analytics import router, initialize_services_api
 
 # Create FastAPI app
 app = FastAPI(
-    title="Logistics & Distribution API",
-    description="Building materials distribution system with analytics",
+    title="Stock Trading API",
+    description="Stock market trading simulation platform",
     version="1.0.0"
 )
 
@@ -56,22 +56,22 @@ async def shutdown_event():
 async def root():
     """Root endpoint"""
     return {
-        "message": "Logistics & Distribution API",
+        "message": "Stock Trading API",
         "endpoints": {
             "dashboard": "/api/dashboard",
-            "inventory_low_stock": "/api/inventory/low-stock",
-            "inventory_branch": "/api/inventory/branch/{branch_id}",
-            "inventory_valuation": "/api/inventory/valuation",
-            "sales_by_category": "/api/sales/by-category",
-            "sales_by_branch": "/api/sales/by-branch",
-            "sales_recent": "/api/sales/recent",
-            "deliveries_summary": "/api/deliveries/summary",
-            "deliveries_delayed": "/api/deliveries/delayed",
-            "fleet_efficiency": "/api/fleet/efficiency"
+            "stocks": "/api/stocks",
+            "stock_history": "/api/stocks/{symbol}",
+            "stock_analysis": "/api/stocks/{symbol}/analysis",
+            "portfolio": "/api/portfolio/{user_id}",
+            "buy_stock": "POST /api/portfolio/{user_id}/buy",
+            "sell_stock": "POST /api/portfolio/{user_id}/sell",
+            "transactions": "/api/portfolio/{user_id}/transactions"
         }
     }
 
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    port = int(os.environ.get("PORT", 8000))
+    logger.info(f"Starting Stock Trading API on http://0.0.0.0:{port}")
+    uvicorn.run(app, host="0.0.0.0", port=port)

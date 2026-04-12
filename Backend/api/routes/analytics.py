@@ -1,219 +1,187 @@
-"""Analytics API routes"""
+"""HIGH-PERFORMANCE stock trading API routes"""
 
 from fastapi import APIRouter, HTTPException
-from Backend.models import PortfolioResponse
-from Backend.services.analytics_service import AnalyticsService
-from Backend.services.inventory_service import InventoryService
-from Backend.services.transaction_service import TransactionService
-from Backend.services.delivery_service import DeliveryService
-from Backend.data_processing.loaders import CSVDataLoader
+from services.stock_service import StockService
+from services.portfolio_service import PortfolioService
+from services.transaction_service import TransactionService
+from data_processing.loaders import StockDataLoader
 import logging
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-# In-memory storage for demo
-holdings = {
-    "user_demo_001": {
-        "AAPL": {"quantity": 10, "avg_price": 145.00},
-        "GOOGL": {"quantity": 2, "avg_price": 2750.00}
-    }
-}
+router = APIRouter(prefix="/api", tags=["stock-trading"])
 
-transactions = {
-    "user_demo_001": [
-        {"id": 1, "symbol": "AAPL", "type": "BUY", "shares": 10, "price": 145.00, "date": "2024-01-01"},
-        {"id": 2, "symbol": "GOOGL", "type": "SELL", "shares": 2, "price": 2750.00, "date": "2024-01-02"}
-    ]
-}
-
-router = APIRouter(prefix="/api", tags=["analytics"])
-
-# Initialize loader and services (global, loaded once)
+# ========================
+# GLOBAL SERVICES (LOADED ONCE)
+# ========================
 loader = None
-analytics_svc = None
-inventory_svc = None
+stock_svc = None
+portfolio_svc = None
 transaction_svc = None
-delivery_svc = None
 
 
 def initialize_services_api():
-    """Call this in server.py startup"""
-    global loader, analytics_svc, inventory_svc, transaction_svc, delivery_svc
-    loader = CSVDataLoader()
-    loader.load_all()
-    analytics_svc = AnalyticsService(loader)
-    inventory_svc = InventoryService(loader)
-    transaction_svc = TransactionService(loader)
-    delivery_svc = DeliveryService(loader)
+    """Initialize once at startup"""
+    global loader, stock_svc, portfolio_svc, transaction_svc
+
+    loader = StockDataLoader()
+    stock_svc = StockService(loader)
+    transaction_svc = TransactionService()
+    portfolio_svc = PortfolioService(stock_svc, transaction_svc)
+
+    print("🔥 Services initialized (OPTIMIZED)")
 
 
-# ============ DASHBOARD ENDPOINTS ============
-
-@router.get("/dashboard")
-async def get_dashboard():
-    """⭐ High-level business overview"""
-    if not analytics_svc:
-        raise HTTPException(status_code=500, detail="Services not initialized")
-    return analytics_svc.get_dashboard_summary()
-
-
+# ========================
+# HEALTH
+# ========================
 @router.get("/health")
 async def health_check():
-    """Health check endpoint"""
-    return {"status": "healthy", "message": "Stock Trading API is running"}
+    return {"status": "healthy"}
 
+
+# ========================
+# STOCKS (FAST)
+# ========================
 @router.get("/stocks")
 async def get_stocks():
-    """Get all available stocks"""
-    logger.info("Fetching all stocks")
-    return [
-        {"symbol": "AAPL", "name": "Apple Inc.", "current_price": 150.25, "change": 2.5},
-        {"symbol": "GOOGL", "name": "Alphabet Inc.", "current_price": 2800.00, "change": -1.2},
-        {"symbol": "MSFT", "name": "Microsoft Corp.", "current_price": 305.50, "change": 0.8},
-        {"symbol": "TSLA", "name": "Tesla Inc.", "current_price": 220.75, "change": 5.3},
-        {"symbol": "AMZN", "name": "Amazon.com Inc.", "current_price": 3200.00, "change": -0.5}
-    ]
+    """🔥 FAST dashboard endpoint (uses simulation index)"""
+    if not stock_svc or not portfolio_svc:
+        raise HTTPException(status_code=500, detail="Services not initialized")
 
-@router.get("/portfolio")
-async def get_portfolio(user_id: str = "user_demo_001"):
-    """Get user portfolio"""
-    user_holdings = holdings.get(user_id, {})
-    stocks_data = [
-        {"symbol": "AAPL", "current_price": 150.25},
-        {"symbol": "GOOGL", "current_price": 2800.00},
-        {"symbol": "MSFT", "current_price": 305.50},
-        {"symbol": "TSLA", "current_price": 220.75},
-        {"symbol": "AMZN", "current_price": 3200.00}
-    ]
-    stocks_dict = {s["symbol"]: s for s in stocks_data}
-    
-    portfolio_holdings = []
-    total_value = 0
-    for symbol, h in user_holdings.items():
-        current_price = stocks_dict.get(symbol, {}).get("current_price", 0)
-        value = h["quantity"] * current_price
-        total_value += value
-        portfolio_holdings.append({
-            "symbol": symbol,
-            "shares": h["quantity"],
-            "avg_price": h["avg_price"],
-            "current_price": current_price,
-            "value": value,
-            "profit_loss": value - (h["quantity"] * h["avg_price"])
-        })
-    
+    sim = portfolio_svc.get_simulation_status()
+    index = sim.get("current_index") if sim.get("running") else None
+
+    return stock_svc.get_all_stocks(index=index)
+
+
+@router.get("/stocks/{company}")
+async def get_stock_history(company: str):
+    """🔥 FAST single stock endpoint"""
+    if not stock_svc or not portfolio_svc:
+        raise HTTPException(status_code=500, detail="Services not initialized")
+
+    history = stock_svc.get_stock_history(company)
+    if not history:
+        raise HTTPException(status_code=404, detail="Stock not found")
+
+    sim = portfolio_svc.get_simulation_status()
+    index = sim.get("current_index") if sim.get("running") else None
+
+    # 🔥 ONLY compute for this stock
+    data = stock_svc.get_all_stocks(index=index)
+    stock_data = next((s for s in data if s["company"] == company), None)
+
     return {
-        "total_value": total_value,
-        "cash_balance": 10000.00,
-        "profit_loss": sum(h["profit_loss"] for h in portfolio_holdings),
-        "holdings": portfolio_holdings
+        "company": company,
+        "history": history,
+        "price": stock_data["price"] if stock_data else 0,
+        "confidence": stock_data["confidence"] if stock_data else 50,
+        "action": stock_data["action"] if stock_data else "HOLD"
     }
 
-@router.get("/transactions")
-async def get_transactions(user_id: str = "user_demo_001"):
-    """Get transaction history"""
-    return transactions.get(user_id, [])
 
-@router.post("/portfolio/buy")
+# ========================
+# TRADING
+# ========================
+@router.post("/buy")
 async def buy_stock(request: dict):
-    """Buy stock"""
-    logger.info(f"Buy request: {request}")
-    user_id = request.get("user_id", "user_demo_001")
-    symbol = request.get("symbol")
-    quantity = request.get("quantity", 1)
-    
-    if not symbol:
-        return {"success": False, "message": "Symbol required"}
-    
-    stocks_data = [
-        {"symbol": "AAPL", "current_price": 150.25},
-        {"symbol": "GOOGL", "current_price": 2800.00},
-        {"symbol": "MSFT", "current_price": 305.50},
-        {"symbol": "TSLA", "current_price": 220.75},
-        {"symbol": "AMZN", "current_price": 3200.00}
-    ]
-    price = next((s["current_price"] for s in stocks_data if s["symbol"] == symbol), 100.00)
-    
-    if user_id not in holdings:
-        holdings[user_id] = {}
-    if symbol not in holdings[user_id]:
-        holdings[user_id][symbol] = {"quantity": 0, "avg_price": 0}
-    
-    current_qty = holdings[user_id][symbol]["quantity"]
-    current_avg = holdings[user_id][symbol]["avg_price"]
-    total_cost = current_qty * current_avg + quantity * price
-    new_qty = current_qty + quantity
-    new_avg = total_cost / new_qty if new_qty > 0 else 0
-    
-    holdings[user_id][symbol] = {"quantity": new_qty, "avg_price": new_avg}
-    
-    if user_id not in transactions:
-        transactions[user_id] = []
-    trans_id = len(transactions[user_id]) + 1
-    transactions[user_id].append({
-        "id": trans_id,
-        "symbol": symbol,
-        "type": "BUY",
-        "shares": quantity,
-        "price": price,
-        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    })
-    
-    logger.info(f"Buy completed: {symbol} x{quantity} for {user_id}")
-    return {"success": True, "message": f"Bought {quantity} shares of {symbol}"}
-
-@router.post("/portfolio/sell")
-async def sell_stock(request: dict):
-    """Sell stock"""
-    logger.info(f"Sell request: {request}")
-    user_id = request.get("user_id", "user_demo_001")
-    symbol = request.get("symbol")
-    quantity = request.get("quantity", 1)
-    
-    if not symbol or user_id not in holdings or symbol not in holdings[user_id]:
-        return {"success": False, "message": "Insufficient holdings"}
-    
-    current_qty = holdings[user_id][symbol]["quantity"]
-    if current_qty < quantity:
-        return {"success": False, "message": "Insufficient shares"}
-    
-    stocks_data = [
-        {"symbol": "AAPL", "current_price": 150.25},
-        {"symbol": "GOOGL", "current_price": 2800.00},
-        {"symbol": "MSFT", "current_price": 305.50},
-        {"symbol": "TSLA", "current_price": 220.75},
-        {"symbol": "AMZN", "current_price": 3200.00}
-    ]
-    price = next((s["current_price"] for s in stocks_data if s["symbol"] == symbol), 100.00)
-    
-    new_qty = current_qty - quantity
-    if new_qty <= 0:
-        del holdings[user_id][symbol]
-    else:
-        holdings[user_id][symbol]["quantity"] = new_qty
-    
-    if user_id not in transactions:
-        transactions[user_id] = []
-    trans_id = len(transactions[user_id]) + 1
-    transactions[user_id].append({
-        "id": trans_id,
-        "symbol": symbol,
-        "type": "SELL",
-        "shares": quantity,
-        "price": price,
-        "date": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    })
-    
-    logger.info(f"Sell completed: {symbol} x{quantity} for {user_id}")
-    return {"success": True, "message": f"Sold {quantity} shares of {symbol}"}
-
-
-# ============ INVENTORY ENDPOINTS ============
-
-@router.get("/inventory/low-stock")
-async def get_low_stock_alerts():
-    """⭐ Items below reorder point - CRITICAL for operations"""
-    if not inventory_svc:
+    if not portfolio_svc:
         raise HTTPException(status_code=500, detail="Services not initialized")
-    return inventory_svc.get_low_stock_items()
+
+    company = request.get("company")
+    quantity = request.get("quantity", 1)
+
+    if not company:
+        raise HTTPException(status_code=400, detail="Company required")
+
+    return portfolio_svc.buy_stock(company, quantity)
+
+
+@router.post("/sell")
+async def sell_stock(request: dict):
+    if not portfolio_svc:
+        raise HTTPException(status_code=500, detail="Services not initialized")
+
+    company = request.get("company")
+    quantity = request.get("quantity", 1)
+
+    if not company:
+        raise HTTPException(status_code=400, detail="Company required")
+
+    return portfolio_svc.sell_stock(company, quantity)
+
+
+# ========================
+# PORTFOLIO
+# ========================
+@router.get("/portfolio")
+async def get_portfolio():
+    if not portfolio_svc:
+        raise HTTPException(status_code=500, detail="Services not initialized")
+    return portfolio_svc.get_portfolio()
+
+
+@router.get("/balance")
+async def get_balance():
+    if not portfolio_svc:
+        raise HTTPException(status_code=500, detail="Services not initialized")
+    return {"balance": portfolio_svc.get_balance()}
+
+
+@router.post("/balance/add")
+async def add_balance(request: dict):
+    if not portfolio_svc:
+        raise HTTPException(status_code=500, detail="Services not initialized")
+
+    amount = request.get("amount", 0)
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+
+    return portfolio_svc.add_balance(amount)
+
+
+@router.post("/balance/subtract")
+async def subtract_balance(request: dict):
+    if not portfolio_svc:
+        raise HTTPException(status_code=500, detail="Services not initialized")
+
+    amount = request.get("amount", 0)
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="Amount must be positive")
+
+    return portfolio_svc.subtract_balance(amount)
+
+
+# ========================
+# SIMULATION
+# ========================
+@router.post("/simulation/start")
+async def start_simulation():
+    if not portfolio_svc:
+        raise HTTPException(status_code=500, detail="Services not initialized")
+    return portfolio_svc.start_simulation()
+
+
+@router.post("/simulation/stop")
+async def stop_simulation():
+    if not portfolio_svc:
+        raise HTTPException(status_code=500, detail="Services not initialized")
+    return portfolio_svc.stop_simulation()
+
+
+@router.get("/simulation/status")
+async def get_simulation_status():
+    if not portfolio_svc:
+        raise HTTPException(status_code=500, detail="Services not initialized")
+    return portfolio_svc.get_simulation_status()
+
+
+# ========================
+# TRANSACTIONS
+# ========================
+@router.get("/transactions")
+async def get_transactions():
+    if not transaction_svc:
+        raise HTTPException(status_code=500, detail="Services not initialized")
+    return {"transactions": transaction_svc.get_transactions()}

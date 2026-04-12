@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { portfolioApi } from '../services/api';
 
-export default function TransactionsPage({ userId }) {
+export default function TransactionsPage() {
   const [transactions, setTransactions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -10,12 +10,12 @@ export default function TransactionsPage({ userId }) {
     fetchTransactions();
     const interval = setInterval(fetchTransactions, 3000);
     return () => clearInterval(interval);
-  }, [userId]);
+  }, []);
 
   const fetchTransactions = async () => {
     console.log('TransactionsPage: Fetching transactions...');
     try {
-      const data = await portfolioApi.getTransactions(userId, 100);
+      const data = await portfolioApi.getTransactions();
       console.log('TransactionsPage: Transactions fetched', data);
       setTransactions(data.transactions || []);
       setError(null);
@@ -52,12 +52,11 @@ export default function TransactionsPage({ userId }) {
             <thead>
               <tr className="border-b border-gray-700">
                 <th className="text-left py-3 text-gray-300">Date</th>
-                <th className="text-left py-3 text-gray-300">Symbol</th>
+                <th className="text-left py-3 text-gray-300">Company</th>
                 <th className="text-left py-3 text-gray-300">Type</th>
                 <th className="text-right py-3 text-gray-300">Quantity</th>
                 <th className="text-right py-3 text-gray-300">Price</th>
-                <th className="text-right py-3 text-gray-300">Amount</th>
-                <th className="text-right py-3 text-gray-300">P&L</th>
+                <th className="text-right py-3 text-gray-300">Total</th>
               </tr>
             </thead>
             <tbody>
@@ -67,20 +66,20 @@ export default function TransactionsPage({ userId }) {
                   className="border-b border-gray-700 hover:bg-gray-700 transition-colors"
                 >
                   <td className="py-4 text-gray-300">
-                    {transaction.date}
+                    {new Date(transaction.date).toLocaleDateString()}
                   </td>
                   <td className="py-4 text-white font-semibold">
-                    {transaction.symbol}
+                    {transaction.company}
                   </td>
                   <td className="py-4">
                     <span
                       className={`px-3 py-1 rounded-full text-xs font-bold ${
-                        transaction.type === 'BUY'
+                        transaction.type === 'buy'
                           ? 'bg-green-900 text-green-300'
                           : 'bg-red-900 text-red-300'
                       }`}
                     >
-                      {transaction.type}
+                      {transaction.type.toUpperCase()}
                     </span>
                   </td>
                   <td className="py-4 text-right text-gray-300">
@@ -90,22 +89,7 @@ export default function TransactionsPage({ userId }) {
                     ${transaction.price.toFixed(2)}
                   </td>
                   <td className="py-4 text-right text-white font-semibold">
-                    ${transaction.total.toFixed(2)}
-                  </td>
-                  <td className="py-4 text-right">
-                    {transaction.profit_loss !== undefined ? (
-                      <span
-                        className={
-                          transaction.profit_loss >= 0
-                            ? 'text-green-400'
-                            : 'text-red-400'
-                        }
-                      >
-                        ${transaction.profit_loss.toFixed(2)}
-                      </span>
-                    ) : (
-                      <span className="text-gray-400">-</span>
-                    )}
+                    ${(transaction.price * transaction.quantity).toFixed(2)}
                   </td>
                 </tr>
               ))}
@@ -113,10 +97,6 @@ export default function TransactionsPage({ userId }) {
           </table>
         </div>
       )}
-
-      <div className="mt-6 text-gray-400 text-sm">
-        <p>Total transactions: {transactions.length}</p>
-      </div>
     </div>
   );
 }

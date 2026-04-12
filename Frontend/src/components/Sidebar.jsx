@@ -7,6 +7,7 @@ export default function Sidebar({ activeTab, setActiveTab }) {
     { id: 'buy-sell', label: 'Buy/Sell', icon: '💰' },
     { id: 'portfolio', label: 'Portfolio', icon: '💼' },
     { id: 'transactions', label: 'History', icon: '📋' },
+    { id: 'settings', label: 'Settings', icon: '⚙️' },
   ];
 
   return (

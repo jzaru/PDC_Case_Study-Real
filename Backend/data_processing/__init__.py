@@ -1,5 +1,5 @@
 """Data processing and CSV loading utilities"""
 
-from .loaders import CSVDataLoader
+from .loaders import StockDataLoader
 
-__all__ = ["CSVDataLoader"]
+__all__ = ["StockDataLoader"]
