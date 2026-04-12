@@ -1,4 +1,4 @@
-"""HIGH-PERFORMANCE stock trading API routes"""
+"""HIGH-PERFORMANCE stock trading API routes (FIXED SELL ALL + VALIDATION)"""
 
 from fastapi import APIRouter, HTTPException
 from services.stock_service import StockService
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["stock-trading"])
 
 # ========================
-# GLOBAL SERVICES (LOADED ONCE)
+# GLOBAL SERVICES
 # ========================
 loader = None
 stock_svc = None
@@ -21,7 +21,6 @@ transaction_svc = None
 
 
 def initialize_services_api():
-    """Initialize once at startup"""
     global loader, stock_svc, portfolio_svc, transaction_svc
 
     loader = StockDataLoader()
@@ -41,11 +40,10 @@ async def health_check():
 
 
 # ========================
-# STOCKS (FAST)
+# STOCKS
 # ========================
 @router.get("/stocks")
 async def get_stocks():
-    """🔥 FAST dashboard endpoint (uses simulation index)"""
     if not stock_svc or not portfolio_svc:
         raise HTTPException(status_code=500, detail="Services not initialized")
 
@@ -57,7 +55,6 @@ async def get_stocks():
 
 @router.get("/stocks/{company}")
 async def get_stock_history(company: str):
-    """🔥 FAST single stock endpoint"""
     if not stock_svc or not portfolio_svc:
         raise HTTPException(status_code=500, detail="Services not initialized")
 
@@ -68,7 +65,6 @@ async def get_stock_history(company: str):
     sim = portfolio_svc.get_simulation_status()
     index = sim.get("current_index") if sim.get("running") else None
 
-    # 🔥 ONLY compute for this stock
     data = stock_svc.get_all_stocks(index=index)
     stock_data = next((s for s in data if s["company"] == company), None)
 
@@ -82,7 +78,7 @@ async def get_stock_history(company: str):
 
 
 # ========================
-# TRADING
+# 🔥 FIXED TRADING
 # ========================
 @router.post("/buy")
 async def buy_stock(request: dict):
@@ -94,6 +90,14 @@ async def buy_stock(request: dict):
 
     if not company:
         raise HTTPException(status_code=400, detail="Company required")
+
+    try:
+        quantity = int(quantity)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid quantity")
+
+    if quantity <= 0:
+        raise HTTPException(status_code=400, detail="Quantity must be > 0")
 
     return portfolio_svc.buy_stock(company, quantity)
 
@@ -108,6 +112,15 @@ async def sell_stock(request: dict):
 
     if not company:
         raise HTTPException(status_code=400, detail="Company required")
+
+    # 🔥 CRITICAL FIX
+    try:
+        quantity = int(quantity)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid quantity")
+
+    if quantity <= 0:
+        raise HTTPException(status_code=400, detail="Quantity must be > 0")
 
     return portfolio_svc.sell_stock(company, quantity)
 
@@ -135,6 +148,12 @@ async def add_balance(request: dict):
         raise HTTPException(status_code=500, detail="Services not initialized")
 
     amount = request.get("amount", 0)
+
+    try:
+        amount = float(amount)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid amount")
+
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
 
@@ -147,6 +166,12 @@ async def subtract_balance(request: dict):
         raise HTTPException(status_code=500, detail="Services not initialized")
 
     amount = request.get("amount", 0)
+
+    try:
+        amount = float(amount)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid amount")
+
     if amount <= 0:
         raise HTTPException(status_code=400, detail="Amount must be positive")
 

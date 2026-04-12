@@ -20,7 +20,6 @@ export default function DashboardPage() {
         stockApi.getAllStocks()
       ]);
 
-      // 🔥 FIX: compute portfolio metrics (backend simplified)
       const holdings = (portfolioData.holdings || []).map(h => {
         const avg_price = h.cost / h.shares;
         const pnl = h.value - h.cost;
@@ -54,8 +53,8 @@ export default function DashboardPage() {
     }
   };
 
-  // 🔥 FIXED SELL (new API format)
-  const handleSell = async (company) => {
+  // ✅ SELL 1 (FIXED)
+  const handleSellOne = async (company) => {
     try {
       await portfolioApi.sellStock({
         company,
@@ -63,7 +62,29 @@ export default function DashboardPage() {
       });
       fetchData();
     } catch (error) {
-      console.error(error);
+      console.error("Sell 1 failed:", error);
+    }
+  };
+
+  // 🔥 SELL ALL (FIXED)
+  const handleSellAll = async (company, shares) => {
+    try {
+      const qty = Number(shares);
+
+      if (!qty || qty <= 0) {
+        console.error("Invalid shares:", shares);
+        return;
+      }
+
+      await portfolioApi.sellStock({
+        company,
+        quantity: qty
+      });
+
+      fetchData();
+
+    } catch (error) {
+      console.error("Sell All failed:", error);
     }
   };
 
@@ -80,22 +101,20 @@ export default function DashboardPage() {
   return (
     <div className="p-6 md:p-10 bg-gradient-to-br from-slate-900 to-gray-950 min-h-screen text-white">
 
-      {/* HEADER */}
       <h1 className="text-4xl font-bold mb-8 text-center tracking-wide">
         📊 Trading Dashboard
       </h1>
 
-      {/* SUMMARY */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
 
-        <div className="bg-gray-800/70 backdrop-blur rounded-2xl p-6 border border-gray-700">
+        <div className="bg-gray-800/70 rounded-2xl p-6 border border-gray-700">
           <p className="text-gray-400 text-sm">Total Invested</p>
           <p className="text-2xl font-bold mt-2">
             ${portfolio.total_cost.toFixed(2)}
           </p>
         </div>
 
-        <div className="bg-gray-800/70 backdrop-blur rounded-2xl p-6 border border-gray-700">
+        <div className="bg-gray-800/70 rounded-2xl p-6 border border-gray-700">
           <p className="text-gray-400 text-sm">Current Value</p>
           <p className="text-2xl font-bold mt-2">
             ${portfolio.total_value.toFixed(2)}
@@ -113,7 +132,7 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        <div className="bg-gray-800/70 backdrop-blur rounded-2xl p-6 border border-gray-700">
+        <div className="bg-gray-800/70 rounded-2xl p-6 border border-gray-700">
           <p className="text-gray-400 text-sm">Return %</p>
           <p className={`text-2xl font-bold mt-2 ${
             pnlPositive ? 'text-green-400' : 'text-red-400'
@@ -124,8 +143,7 @@ export default function DashboardPage() {
 
       </div>
 
-      {/* HOLDINGS */}
-      <div className="bg-gray-900/70 backdrop-blur rounded-2xl p-6 border border-gray-700 shadow-xl">
+      <div className="bg-gray-900/70 rounded-2xl p-6 border border-gray-700">
 
         <h2 className="text-2xl font-semibold mb-6">📈 Active Positions</h2>
 
@@ -142,11 +160,10 @@ export default function DashboardPage() {
               return (
                 <div
                   key={h.company}
-                  className="bg-gray-800/70 p-5 rounded-xl border border-gray-700 hover:border-gray-500 transition"
+                  className="bg-gray-800/70 p-5 rounded-xl border border-gray-700"
                 >
                   <div className="flex justify-between items-center">
 
-                    {/* LEFT */}
                     <div>
                       <p className="text-lg font-bold">{h.company}</p>
                       <p className="text-sm text-gray-400">
@@ -154,7 +171,6 @@ export default function DashboardPage() {
                       </p>
                     </div>
 
-                    {/* RIGHT */}
                     <div className="text-right">
                       <p className="text-xl font-bold">
                         ${h.value.toFixed(2)}
@@ -166,12 +182,9 @@ export default function DashboardPage() {
 
                   </div>
 
-                  {/* ACTION BAR */}
                   <div className="flex justify-between items-center mt-4">
 
-                    {/* SIGNAL */}
                     <div className="flex items-center gap-4 text-sm">
-
                       <span className="text-blue-400 font-semibold">
                         Confidence: {h.confidence ?? 50}%
                       </span>
@@ -183,16 +196,23 @@ export default function DashboardPage() {
                       }`}>
                         {h.action ?? 'HOLD'}
                       </span>
-
                     </div>
 
-                    {/* SELL BUTTON */}
-                    <button
-                      onClick={() => handleSell(h.company)}
-                      className="bg-red-500 hover:bg-red-600 px-4 py-2 rounded-lg font-semibold transition"
-                    >
-                      Sell 1
-                    </button>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleSellOne(h.company)}
+                        className="bg-red-500 hover:bg-red-600 px-3 py-2 rounded-lg text-sm"
+                      >
+                        Sell 1
+                      </button>
+
+                      <button
+                        onClick={() => handleSellAll(h.company, h.shares)}
+                        className="bg-red-700 hover:bg-red-800 px-3 py-2 rounded-lg text-sm"
+                      >
+                        Sell All
+                      </button>
+                    </div>
 
                   </div>
                 </div>

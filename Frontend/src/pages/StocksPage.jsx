@@ -7,14 +7,14 @@ export default function StocksPage({ onSelectStock }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [sortBy, setSortBy] = useState('name');
+  const [sortBy, setSortBy] = useState('priority');
   const [simulationRunning, setSimulationRunning] = useState(false);
 
   useEffect(() => {
     fetchStocks();
     fetchSimulationStatus();
 
-    const interval = setInterval(fetchStocks, simulationRunning ? 2000 : 10000);
+    const interval = setInterval(fetchStocks, simulationRunning ? 3000 : 10000);
     return () => clearInterval(interval);
   }, [simulationRunning]);
 
@@ -27,7 +27,6 @@ export default function StocksPage({ onSelectStock }) {
     try {
       const data = await stockApi.getAllStocks();
 
-      // 🔥 Normalize backend response → frontend-safe
       const normalized = data.map(stock => ({
         ...stock,
         current_price: stock.price ?? 0,
@@ -54,20 +53,45 @@ export default function StocksPage({ onSelectStock }) {
     }
   };
 
+  // 🔥 ACTION PRIORITY MAP
+  const actionPriority = {
+    BUY: 3,
+    SELL: 2,
+    HOLD: 1
+  };
+
   const filteredAndSortedStocks = stocks
     .filter((stock) =>
       stock.company.toLowerCase().includes(searchTerm.toLowerCase())
     )
     .sort((a, b) => {
       switch (sortBy) {
+
+        case 'priority':
+          // 🔥 BUY → SELL → HOLD
+          if (actionPriority[b.action] !== actionPriority[a.action]) {
+            return actionPriority[b.action] - actionPriority[a.action];
+          }
+          return b.confidence - a.confidence;
+
+        case 'buy_first':
+          if (a.action === 'BUY' && b.action !== 'BUY') return -1;
+          if (b.action === 'BUY' && a.action !== 'BUY') return 1;
+          return b.confidence - a.confidence;
+
+        case 'sell_first':
+          if (a.action === 'SELL' && b.action !== 'SELL') return -1;
+          if (b.action === 'SELL' && a.action !== 'SELL') return 1;
+          return b.confidence - a.confidence;
+
+        case 'confidence':
+          return b.confidence - a.confidence;
+
         case 'price_low':
           return a.current_price - b.current_price;
 
         case 'price_high':
           return b.current_price - a.current_price;
-
-        case 'confidence':
-          return b.confidence - a.confidence;
 
         case 'name':
         default:
@@ -101,16 +125,19 @@ export default function StocksPage({ onSelectStock }) {
           />
         </div>
 
-        <div className="w-full lg:w-48">
+        <div className="w-full lg:w-56">
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
             className="w-full px-4 py-3 bg-gray-800 text-white border border-gray-700 rounded-lg"
           >
-            <option value="name">Name (A-Z)</option>
+            <option value="priority">🔥 Signal Priority (BUY → SELL → HOLD)</option>
+            <option value="buy_first">🚀 BUY First</option>
+            <option value="sell_first">📉 SELL First</option>
+            <option value="confidence">Confidence</option>
             <option value="price_low">Price: Low to High</option>
             <option value="price_high">Price: High to Low</option>
-            <option value="confidence">Confidence</option>
+            <option value="name">Name (A-Z)</option>
           </select>
         </div>
       </div>

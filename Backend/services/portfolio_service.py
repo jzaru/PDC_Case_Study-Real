@@ -1,4 +1,4 @@
-"""FAST + FIXED Portfolio Service (NO PERFORMANCE REGRESSION)"""
+"""FAST + SMART Portfolio Service (ML + RISK MANAGEMENT FIXED)"""
 
 from typing import List, Dict, Any
 import logging
@@ -29,7 +29,7 @@ class PortfolioService:
         self._load_simulation_state()
 
     # ========================
-    # BALANCE (FIXED RESPONSE)
+    # BALANCE
     # ========================
 
     def _load_balance(self):
@@ -56,10 +56,7 @@ class PortfolioService:
         self.balance += amount
         self._save_balance()
 
-        return {
-            'success': True,
-            'balance': self.balance  # 🔥 FIXED
-        }
+        return {'success': True, 'balance': self.balance}
 
     def subtract_balance(self, amount):
         if amount <= 0 or amount > self.balance:
@@ -68,33 +65,29 @@ class PortfolioService:
         self.balance -= amount
         self._save_balance()
 
-        return {
-            'success': True,
-            'balance': self.balance  # 🔥 FIXED
-        }
+        return {'success': True, 'balance': self.balance}
 
     # ========================
-    # PRICE (FAST + SAFE)
+    # PRICE
     # ========================
 
     def _get_price(self, company):
         try:
             if self.simulation_running:
-                price = self.stock_service.get_price_at_index(company, self.simulation_index)
-            else:
-                data = self.stock_service.loader.stock_data.get(company)
-                if not data:
-                    return 0
-                price = data["prices"][-1]
+                return self.stock_service.get_price_at_index(company, self.simulation_index)
 
-            return float(price) if price else 0
+            data = self.stock_service.loader.stock_data.get(company)
+            if not data:
+                return 0
+
+            return data["prices"][-1]
 
         except Exception as e:
             logger.error(f"Price error: {e}")
             return 0
 
     # ========================
-    # BUY / SELL (OPTIMIZED)
+    # BUY / SELL
     # ========================
 
     def buy_stock(self, company, quantity):
@@ -102,10 +95,6 @@ class PortfolioService:
             return {'success': False, 'message': 'Invalid quantity'}
 
         price = self._get_price(company)
-
-        if price <= 0:
-            return {'success': False, 'message': 'Invalid stock price'}
-
         total = price * quantity
 
         if total > self.balance:
@@ -119,28 +108,17 @@ class PortfolioService:
         return {'success': True, 'transaction': tx}
 
     def sell_stock(self, company, quantity):
-        if quantity <= 0:
-            return {'success': False, 'message': 'Invalid quantity'}
-
-        # 🔥 FAST SHARE CHECK (NO HEAVY COMPUTE)
         transactions = self.transaction_service.get_transactions()
-        shares = 0
 
+        shares = 0
         for tx in transactions:
             if tx['company'] == company:
-                if tx['type'] == 'buy':
-                    shares += tx['quantity']
-                else:
-                    shares -= tx['quantity']
+                shares += tx['quantity'] if tx['type'] == 'buy' else -tx['quantity']
 
         if shares < quantity:
             return {'success': False, 'message': 'Not enough shares'}
 
         price = self._get_price(company)
-
-        if price <= 0:
-            return {'success': False, 'message': 'Invalid stock price'}
-
         total = price * quantity
 
         tx = self.transaction_service.sell_stock(company, quantity, price)
@@ -151,7 +129,7 @@ class PortfolioService:
         return {'success': True, 'transaction': tx}
 
     # ========================
-    # PORTFOLIO
+    # PORTFOLIO (🔥 FIXED WITH RISK LOGIC)
     # ========================
 
     def get_portfolio(self):
@@ -185,20 +163,47 @@ class PortfolioService:
             if d['shares'] <= 0:
                 continue
 
-            price = self._get_price(company)
+            stock_data = self.stock_service.get_single_stock(
+                company,
+                index=self.simulation_index if self.simulation_running else None
+            )
+
+            if not stock_data:
+                continue
+
+            price = stock_data["price"]
+            avg_buy_price = d['cost'] / d['shares']
+
+            profit_percent = ((price - avg_buy_price) / avg_buy_price) * 100
+
+            ml_action = stock_data["action"]
+            confidence = stock_data["confidence"]
+
+            # 🔥 SMART DECISION LAYER
+            if profit_percent < -2 and confidence < 75:
+                action = "SELL"  # stop loss
+
+            elif profit_percent > 3:
+                action = "SELL"  # take profit
+
+            else:
+                action = ml_action  # fallback to ML
 
             result.append({
                 'company': company,
                 'shares': d['shares'],
                 'current_price': price,
                 'value': d['shares'] * price,
-                'cost': d['cost']
+                'cost': d['cost'],
+                'profit_percent': round(profit_percent, 2),
+                'confidence': confidence,
+                'action': action
             })
 
         return result
 
     # ========================
-    # SIMULATION (LIGHT)
+    # SIMULATION
     # ========================
 
     def _load_simulation_state(self):
@@ -210,14 +215,6 @@ class PortfolioService:
                     self.simulation_running = data.get('running', False)
         except:
             pass
-
-    def _save_simulation_state(self):
-        os.makedirs(os.path.dirname(SIMULATION_FILE), exist_ok=True)
-        with open(SIMULATION_FILE, 'w') as f:
-            json.dump({
-                'index': self.simulation_index,
-                'running': self.simulation_running
-            }, f)
 
     def start_simulation(self):
         if self.simulation_running:
