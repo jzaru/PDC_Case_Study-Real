@@ -8,9 +8,12 @@ export default function AnalysisModal({ stock, history, onClose }) {
   const [enhancedMessage, setEnhancedMessage] = useState('');
   const [timeBasedInsight, setTimeBasedInsight] = useState('');
 
-  // Dynamic analysis data
-  const confidence = Math.floor(Math.random() * 40) + 60; // 60-100%
-  const recommendation = confidence > 70 ? 'BUY' : confidence > 50 ? 'HOLD' : 'SELL';
+  // 🔥 NEW: Use real data from stock
+  const confidence = stock.confidence || 50;
+  const recommendation = stock.action || 'HOLD';
+  const signalStrength = stock.signal_strength || 'WEAK';
+  const trendDirection = stock.trend_direction || 'FLAT';
+  const peakDetected = stock.peak_detected || false;
 
   // 🔥 NEW FEATURE: Smart Recommendation Text
   useEffect(() => {
@@ -20,29 +23,31 @@ export default function AnalysisModal({ stock, history, onClose }) {
         ? 'Strong upward trend. Consider buying now.'
         : 'Uptrend detected, but consider waiting for a better entry.';
     } else if (recommendation === 'SELL') {
-      message = confidence > 80
-        ? 'Strong downward signal. Consider selling soon.'
-        : 'Possible decline. Monitor before selling.';
+      if (peakDetected) {
+        message = 'Price likely near peak. Consider selling before decline.';
+      } else {
+        message = confidence > 80
+          ? 'Strong downward signal. Consider selling soon.'
+          : 'Possible decline. Monitor before selling.';
+      }
     } else {
       message = 'Market is uncertain. Wait for clearer signals.';
     }
     setEnhancedMessage(message);
-  }, [recommendation, confidence]);
+  }, [recommendation, confidence, peakDetected]);
 
   // 🔥 NEW FEATURE: Time-Based Insight
   useEffect(() => {
     let insight = '';
-    if (confidence > 85) {
+    if (trendDirection === 'UP') {
       insight = 'Momentum increasing — entry window soon';
-    } else if (confidence > 70) {
+    } else if (trendDirection === 'DOWN') {
       insight = 'Short-term dip expected before rise';
-    } else if (confidence > 60) {
-      insight = 'Volatility detected — avoid immediate action';
     } else {
-      insight = 'High uncertainty — wait for clearer signals';
+      insight = 'Volatility detected — avoid immediate action';
     }
     setTimeBasedInsight(insight);
-  }, [confidence]);
+  }, [trendDirection]);
 
   // 🔥 NEW FEATURE: Prediction Time and Loading State
   useEffect(() => {
@@ -86,6 +91,18 @@ export default function AnalysisModal({ stock, history, onClose }) {
               )}
             </div>
 
+            {/* 🔥 NEW FEATURE: Peak Warning */}
+            {peakDetected && (
+              <div className="bg-red-900 rounded-lg p-4 border-l-4 border-red-500">
+                <h3 className="text-lg font-semibold text-red-300 mb-2">
+                  🔺 Peak Detected
+                </h3>
+                <p className="text-gray-200">
+                  This stock may be at a local high. Selling now could secure profits.
+                </p>
+              </div>
+            )}
+
             {/* 🔥 NEW FEATURE: UI Improvement - Stat Card Row */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="bg-green-900 rounded-lg p-4 text-center">
@@ -121,6 +138,12 @@ export default function AnalysisModal({ stock, history, onClose }) {
                   recommendation === 'SELL' ? 'text-red-400' : 'text-gray-400'
                 }`}>
                   {recommendation}
+                </div>
+                {/* 🔥 NEW: Trend Badge */}
+                <div className="mt-2">
+                  {trendDirection === 'UP' && <span className="bg-green-600 text-white px-2 py-1 rounded text-xs">📈 Uptrend</span>}
+                  {trendDirection === 'DOWN' && <span className="bg-red-600 text-white px-2 py-1 rounded text-xs">📉 Downtrend</span>}
+                  {trendDirection === 'FLAT' && <span className="bg-gray-600 text-white px-2 py-1 rounded text-xs">📊 Flat</span>}
                 </div>
               </div>
             </div>

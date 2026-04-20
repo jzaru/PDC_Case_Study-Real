@@ -22,6 +22,8 @@ export default function SettingsPage() {
   // 🔥 NEW
   const [trainingTime, setTrainingTime] = useState(0);
   const [trainingMode, setTrainingMode] = useState("FAST");
+  // 🔥 NEW: Training Loading State
+  const [trainingLoading, setTrainingLoading] = useState(false);
 
   useEffect(() => {
     fetchAll();
@@ -66,14 +68,22 @@ export default function SettingsPage() {
     }
   };
 
+  // 🔥 NEW: Training mode handler with loading state
   const setMode = async (mode) => {
-    const res = await performanceApi.setTrainingMode(mode);
+    setTrainingLoading(true);
+    try {
+      const res = await performanceApi.setTrainingMode(mode);
 
-    setTrainingMode(res.mode);
-    setTrainingTime(res.training_time);
+      setTrainingMode(res.mode);
+      setTrainingTime(res.training_time);
 
-    setShowPopup(true);
-    setTimeout(() => setShowPopup(false), 2000);
+      setShowPopup(true);
+      setTimeout(() => setShowPopup(false), 2000);
+    } catch (err) {
+      console.error('Training mode error:', err);
+    } finally {
+      setTrainingLoading(false);
+    }
   };
 
 
@@ -241,26 +251,40 @@ export default function SettingsPage() {
             <div className="flex gap-2">
               <button
                 onClick={() => setMode("FAST")}
+                disabled={trainingLoading}
                 className={`px-4 py-2 rounded-lg transition ${
                   trainingMode === "FAST"
                     ? "bg-green-500 scale-105"
                     : "bg-gray-600 hover:scale-105"
+                } ${
+                  trainingLoading ? "opacity-50 cursor-not-allowed" : ""
                 }`}
               >
-                FAST ⚡
+                {trainingLoading && trainingMode === "FAST" ? "Training..." : "FAST ⚡"}
               </button>
 
               <button
                 onClick={() => setMode("FULL")}
+                disabled={trainingLoading}
                 className={`px-4 py-2 rounded-lg transition ${
                   trainingMode === "FULL"
                     ? "bg-purple-500 scale-105"
                     : "bg-gray-600 hover:scale-105"
+                } ${
+                  trainingLoading ? "opacity-50 cursor-not-allowed" : ""
                 }`}
               >
-                FULL 🧠
+                {trainingLoading && trainingMode === "FULL" ? "Training..." : "FULL 🧠"}
               </button>
             </div>
+
+            {/* 🔥 NEW: Training Loading Feedback */}
+            {trainingLoading && (
+              <div className="mt-3 flex items-center gap-2 text-blue-400 animate-pulse">
+                <div className="w-4 h-4 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                <span>⚙️ Training model... please wait</span>
+              </div>
+            )}
           </div>      
 
           {/* WORKER CONTROL UI */}
@@ -290,7 +314,10 @@ export default function SettingsPage() {
 
             <button
               onClick={applyWorkers}
-              className="mt-3 bg-blue-500 w-full py-2 rounded-lg hover:scale-105 active:scale-95 transition"
+              disabled={trainingLoading}
+              className={`mt-3 bg-blue-500 w-full py-2 rounded-lg hover:scale-105 active:scale-95 transition ${
+                trainingLoading ? "opacity-50 cursor-not-allowed" : ""
+              }`}
             >
               Apply Workers
             </button>
@@ -310,14 +337,20 @@ export default function SettingsPage() {
 
           <button
             onClick={togglePerformance}
-            className="bg-green-500 w-full py-2 rounded-lg mt-4 hover:scale-105 active:scale-95 transition"
+            disabled={trainingLoading}
+            className={`bg-green-500 w-full py-2 rounded-lg mt-4 hover:scale-105 active:scale-95 transition ${
+              trainingLoading ? "opacity-50 cursor-not-allowed" : ""
+            }`}
           >
             Run Live Test
           </button>
 
           <button
             onClick={runWorkerBenchmark}
-            className="bg-purple-500 w-full py-2 rounded-lg mt-2 hover:scale-105 active:scale-95 transition"
+            disabled={trainingLoading}
+            className={`bg-purple-500 w-full py-2 rounded-lg mt-2 hover:scale-105 active:scale-95 transition ${
+              trainingLoading ? "opacity-50 cursor-not-allowed" : ""
+            }`}
           >
             Run Benchmark
           </button>

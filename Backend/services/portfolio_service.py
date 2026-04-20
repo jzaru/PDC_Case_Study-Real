@@ -5,10 +5,22 @@ import logging
 import json
 import os
 import asyncio
+import numpy as np
 from .transaction_service import TransactionService
 from .stock_service import StockService
 
 logger = logging.getLogger(__name__)
+
+# 🔥 FIX: numpy → python conversion
+def to_python(obj):
+    """Convert NumPy types to native Python types for JSON serialization"""
+    if isinstance(obj, np.generic):
+        return obj.item()
+    elif isinstance(obj, dict):
+        return {k: to_python(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [to_python(v) for v in obj]
+    return obj
 
 BALANCE_FILE = os.path.join(os.path.dirname(__file__), '..', 'data', 'balance.json')
 SIMULATION_FILE = os.path.join(os.path.dirname(__file__), '..', 'data', 'simulation.json')
@@ -136,11 +148,13 @@ class PortfolioService:
         holdings = self._compute_holdings()
         total_value = sum(h['value'] for h in holdings)
 
-        return {
+        # 🔥 FIX: Convert to ensure JSON serialization
+        portfolio = {
             'holdings': holdings,
-            'cash': self.balance,
-            'portfolio_value': total_value + self.balance
+            'cash': float(self.balance),
+            'portfolio_value': float(total_value + self.balance)
         }
+        return to_python(portfolio)
 
     def _compute_holdings(self):
         transactions = self.transaction_service.get_transactions()

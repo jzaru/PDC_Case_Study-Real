@@ -5,8 +5,20 @@ from data_processing.loaders import StockDataLoader
 from models.ml_model import StockMLModel
 import logging
 import time
+import numpy as np
 
 logger = logging.getLogger(__name__)
+
+# 🔥 FIX: numpy → python conversion
+def to_python(obj):
+    """Convert NumPy types to native Python types for JSON serialization"""
+    if isinstance(obj, np.generic):
+        return obj.item()
+    elif isinstance(obj, dict):
+        return {k: to_python(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [to_python(v) for v in obj]
+    return obj
 
 
 class StockService:
@@ -124,16 +136,20 @@ class StockService:
                 start = max(0, idx - 10)
                 relevant_prices = prices[start:idx + 1]
 
-                analysis = self.model.predict(relevant_prices)
+                analysis = self.model.predict(relevant_prices, owns_stock=False)
 
-                results.append({
-                    "company": company,
-                    "name": stock["name"],
-                    "price": round(current_price, 2),
-                    "confidence": analysis["confidence"],
-                    "action": analysis["action"],
-                    "signal": analysis.get("signal", "WEAK")
-                })
+                # 🔥 FIX: Convert all values to Python types before appending
+                stock_result = {
+                    "company": str(company),
+                    "name": str(stock["name"]),
+                    "price": float(round(current_price, 2)),
+                    "confidence": float(analysis["confidence"]),
+                    "action": str(analysis["action"]),
+                    "signal_strength": str(analysis.get("signal_strength", "WEAK")),
+                    "trend_direction": str(analysis.get("trend_direction", "FLAT")),
+                    "peak_detected": bool(analysis.get("peak_detected", False))
+                }
+                results.append(to_python(stock_result))
 
             except Exception as e:
                 logger.error(f"Error processing stock {stock}: {e}")
@@ -184,7 +200,9 @@ class StockService:
         start = max(0, idx - 10)
         relevant_prices = prices[start:idx + 1]
 
-        return self.model.predict(relevant_prices)
+        # 🔥 FIX: Convert prediction result to Python types
+        prediction = self.model.predict(relevant_prices, owns_stock=False)
+        return to_python(prediction)
 
     # ========================
     # HISTORY

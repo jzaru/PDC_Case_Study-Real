@@ -5,6 +5,17 @@ import time
 
 logger = logging.getLogger(__name__)
 
+# 🔥 FIX: numpy → python conversion
+def to_python(obj):
+    """Convert NumPy types to native Python types for JSON serialization"""
+    if isinstance(obj, np.generic):
+        return obj.item()
+    elif isinstance(obj, dict):
+        return {k: to_python(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [to_python(v) for v in obj]
+    return obj
+
 
 class StockMLModel:
     """ADVANCED ML model with HIGH-CONFIDENCE prediction system"""
@@ -131,9 +142,9 @@ class StockMLModel:
     # 🔥 HIGH-CONFIDENCE PREDICTION
     # ========================
 
-    def predict(self, prices):
+    def predict(self, prices, owns_stock=False):
         if not self.trained:
-            return {"action": "HOLD", "confidence": 50.0, "signal": "WEAK"}
+            return {"action": "HOLD", "confidence": 50.0, "signal_strength": "WEAK", "trend_direction": "FLAT", "peak_detected": False}
 
         try:
             features = self.create_features(prices)
@@ -166,22 +177,72 @@ class StockMLModel:
 
             if confidence >= 90 and margin > 0.2:
                 action = raw_action
-                signal = "STRONG"
+                signal_strength = "STRONG"
 
             elif confidence >= 75 and margin > 0.1:
                 action = raw_action
-                signal = "MEDIUM"
+                signal_strength = "MEDIUM"
 
             else:
                 action = "HOLD"
-                signal = "WEAK"
+                signal_strength = "WEAK"
 
-            return {
+            # 🔥 NEW: Peak Detection
+            peak_detected = self._detect_peak(prices)
+            trend_direction = self._get_trend_direction(prices)
+
+            # 🔥 NEW: Peak-Aware Sell Recommendation
+            if peak_detected and owns_stock and action != "SELL":
+                action = "SELL"
+                signal_strength = "STRONG"  # Override to strong sell signal
+
+            # 🔥 FIX: Convert entire response to Python types
+            result = {
                 "action": action,
-                "confidence": round(confidence, 2),
-                "signal": signal
+                "confidence": float(round(confidence, 2)),
+                "signal_strength": signal_strength,
+                "trend_direction": trend_direction,
+                "peak_detected": bool(peak_detected)
             }
+            return to_python(result)
 
         except Exception as e:
             logger.error(f"Prediction error: {e}")
-            return {"action": "HOLD", "confidence": 50.0, "signal": "WEAK"}
+            return {"action": "HOLD", "confidence": 50.0, "signal_strength": "WEAK", "trend_direction": "FLAT", "peak_detected": False}
+
+    # 🔥 NEW: Peak Detection Heuristic
+    def _detect_peak(self, prices):
+        if len(prices) < 10:
+            return False
+
+        recent_prices = prices[-10:]
+        current_price = recent_prices[-1]
+        recent_max = np.max(recent_prices)
+
+        # 🔥 FIX: Convert NumPy bool to Python bool
+        # Check if current price is near recent max (within 2-3%)
+        near_peak = bool((current_price / recent_max) >= 0.97)
+
+        # Check if trend is flattening or turning down
+        if len(recent_prices) >= 5:
+            recent_trend = np.polyfit(range(5), recent_prices[-5:], 1)[0]
+            flattening = bool(abs(recent_trend) < 0.001)  # Very small slope
+        else:
+            flattening = False
+
+        return near_peak and flattening
+
+    # 🔥 NEW: Trend Direction
+    def _get_trend_direction(self, prices):
+        if len(prices) < 5:
+            return "FLAT"
+
+        recent_prices = prices[-5:]
+        slope = np.polyfit(range(5), recent_prices, 1)[0]
+
+        if slope > 0.01:
+            return "UP"
+        elif slope < -0.01:
+            return "DOWN"
+        else:
+            return "FLAT"

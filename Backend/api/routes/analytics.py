@@ -6,8 +6,20 @@ from services.portfolio_service import PortfolioService
 from services.transaction_service import TransactionService
 from data_processing.loaders import StockDataLoader
 import logging
+import numpy as np
 
 logger = logging.getLogger(__name__)
+
+# 🔥 FIX: numpy → python conversion
+def to_python(obj):
+    """Convert NumPy types to native Python types for JSON serialization"""
+    if isinstance(obj, np.generic):
+        return obj.item()
+    elif isinstance(obj, dict):
+        return {k: to_python(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [to_python(v) for v in obj]
+    return obj
 
 router = APIRouter(prefix="/api", tags=["stock-trading"])
 
@@ -50,7 +62,9 @@ async def get_stocks():
     sim = portfolio_svc.get_simulation_status()
     index = sim.get("current_index") if sim.get("running") else None
 
-    return stock_svc.get_all_stocks(index=index)
+    # 🔥 FIX: Convert result to ensure JSON serialization
+    result = stock_svc.get_all_stocks(index=index)
+    return to_python(result)
 
 
 @router.get("/stocks/{company}")
@@ -68,13 +82,18 @@ async def get_stock_history(company: str):
     # 🔥 FIX: DO NOT RECOMPUTE ALL STOCKS
     stock_data = stock_svc.get_single_stock(company, index=index)
 
-    return {
-        "company": company,
+    # 🔥 FIX: Convert response to ensure JSON serialization
+    response = {
+        "company": str(company),
         "history": history,
-        "price": stock_data["price"] if stock_data else 0,
-        "confidence": stock_data["confidence"] if stock_data else 50,
-        "action": stock_data["action"] if stock_data else "HOLD"
+        "price": float(stock_data["price"]) if stock_data else 0.0,
+        "confidence": float(stock_data["confidence"]) if stock_data else 50.0,
+        "action": str(stock_data["action"]) if stock_data else "HOLD",
+        "signal_strength": str(stock_data.get("signal_strength", "WEAK")) if stock_data else "WEAK",
+        "trend_direction": str(stock_data.get("trend_direction", "FLAT")) if stock_data else "FLAT",
+        "peak_detected": bool(stock_data.get("peak_detected", False)) if stock_data else False
     }
+    return to_python(response)
 
 
 # ========================
@@ -168,9 +187,11 @@ async def get_ml_stats():
     if not stock_svc:
         raise HTTPException(status_code=500, detail="Stock service not initialized")
 
-    return {
-        "training_time": stock_svc.model.get_training_time()
+    # 🔥 FIX: Convert to ensure JSON serialization
+    result = {
+        "training_time": float(stock_svc.model.get_training_time())
     }
+    return to_python(result)
 
 
 # ========================
@@ -201,14 +222,18 @@ async def get_training_mode():
 async def get_portfolio():
     if not portfolio_svc:
         raise HTTPException(status_code=500, detail="Services not initialized")
-    return portfolio_svc.get_portfolio()
+    # 🔥 FIX: Convert to ensure JSON serialization
+    portfolio = portfolio_svc.get_portfolio()
+    return to_python(portfolio)
 
 
 @router.get("/balance")
 async def get_balance():
     if not portfolio_svc:
         raise HTTPException(status_code=500, detail="Services not initialized")
-    return {"balance": portfolio_svc.get_balance()}
+    # 🔥 FIX: Convert to ensure JSON serialization
+    result = {"balance": float(portfolio_svc.get_balance())}
+    return to_python(result)
 
 
 @router.post("/balance/add")
