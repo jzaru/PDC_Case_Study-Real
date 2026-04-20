@@ -1,12 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { stockApi } from '../services/api';
 import AnalysisModal from './AnalysisModal';
 
-export default function StockCard({ stock, onSelect }) {
+const StockCard = React.memo(function StockCard({ stock, onSelect }) {
   const [showModal, setShowModal] = useState(false);
   const [history, setHistory] = useState([]);
 
-  const handleViewAnalysis = async () => {
+  const handleViewAnalysis = useCallback(async () => {
     try {
       const data = await stockApi.getStockHistory(stock.company);
       setHistory(data.history || []);
@@ -14,10 +14,12 @@ export default function StockCard({ stock, onSelect }) {
     } catch (error) {
       console.error('Error fetching history:', error);
     }
-  };
+  }, [stock.company]);
+
+  const handleCloseModal = useCallback(() => setShowModal(false), []);
 
   // 🔥 Action styling
-  const getActionStyles = () => {
+  const getActionStyles = useCallback(() => {
     switch (stock.action) {
       case 'BUY':
         return {
@@ -38,12 +40,12 @@ export default function StockCard({ stock, onSelect }) {
           label: 'HOLD'
         };
     }
-  };
+  }, [stock.action]);
 
   const actionStyle = getActionStyles();
 
   // 🔥 ACTION BUTTON LOGIC
-  const renderActionButton = () => {
+  const renderActionButton = useCallback(() => {
     if (stock.action === 'BUY') {
       return (
         <button
@@ -74,7 +76,7 @@ export default function StockCard({ stock, onSelect }) {
         Hold / View
       </button>
     );
-  };
+  }, [stock.action, stock.company, onSelect]);
 
   return (
     <>
@@ -120,9 +122,11 @@ export default function StockCard({ stock, onSelect }) {
         <AnalysisModal
           stock={stock}
           history={history}
-          onClose={() => setShowModal(false)}
+          onClose={handleCloseModal}
         />
       )}
     </>
   );
-}
+});
+
+export default StockCard;

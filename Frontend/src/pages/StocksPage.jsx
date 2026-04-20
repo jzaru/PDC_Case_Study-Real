@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { stockApi, simulationApi } from '../services/api';
 import StockCard from '../components/StockCard';
 
@@ -7,6 +7,7 @@ export default function StocksPage({ onSelectStock }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [sortBy, setSortBy] = useState('priority');
   const [simulationRunning, setSimulationRunning] = useState(false);
 
@@ -23,9 +24,17 @@ export default function StocksPage({ onSelectStock }) {
     return () => clearInterval(statusInterval);
   }, []);
 
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   const fetchStocks = async () => {
+    const startTime = performance.now();
     try {
       const data = await stockApi.getAllStocks();
+      const fetchTime = performance.now() - startTime;
+      console.log(`Backend fetch time: ${fetchTime.toFixed(2)}ms`);
 
       const normalized = data.map(stock => ({
         ...stock,
@@ -37,6 +46,7 @@ export default function StocksPage({ onSelectStock }) {
       setStocks(normalized);
       setError(null);
     } catch (err) {
+      console.error("Error fetching stocks:", err);
       setError('Failed to fetch stocks');
       console.error(err);
     } finally {
@@ -60,44 +70,40 @@ export default function StocksPage({ onSelectStock }) {
     HOLD: 1
   };
 
-  const filteredAndSortedStocks = stocks
-    .filter((stock) =>
-      stock.company.toLowerCase().includes(searchTerm.toLowerCase())
-    )
-    .sort((a, b) => {
+  const filteredAndSortedStocks = useMemo(() => {
+    console.time('Filter and sort');
+    const filtered = stocks.filter((stock) =>
+      stock.company.toLowerCase().includes(debouncedSearch.toLowerCase())
+    );
+    const sorted = filtered.sort((a, b) => {
       switch (sortBy) {
-
         case 'priority':
-          // 🔥 BUY → SELL → HOLD
           if (actionPriority[b.action] !== actionPriority[a.action]) {
             return actionPriority[b.action] - actionPriority[a.action];
           }
           return b.confidence - a.confidence;
-
         case 'buy_first':
           if (a.action === 'BUY' && b.action !== 'BUY') return -1;
           if (b.action === 'BUY' && a.action !== 'BUY') return 1;
           return b.confidence - a.confidence;
-
         case 'sell_first':
           if (a.action === 'SELL' && b.action !== 'SELL') return -1;
           if (b.action === 'SELL' && a.action !== 'SELL') return 1;
           return b.confidence - a.confidence;
-
         case 'confidence':
           return b.confidence - a.confidence;
-
         case 'price_low':
           return a.current_price - b.current_price;
-
         case 'price_high':
           return b.current_price - a.current_price;
-
         case 'name':
         default:
           return a.company.localeCompare(b.company);
       }
     });
+    console.timeEnd('Filter and sort');
+    return sorted;
+  }, [stocks, debouncedSearch, sortBy]);
 
   if (loading) {
     return <div className="text-white text-center py-10">Loading stocks...</div>;
@@ -105,6 +111,10 @@ export default function StocksPage({ onSelectStock }) {
 
   if (error) {
     return <div className="text-red-400 text-center py-10">{error}</div>;
+  }
+
+  if (!stocks || stocks.length === 0) {
+    return <div className="text-white p-6">No stocks available</div>;
   }
 
   return (
@@ -145,11 +155,7 @@ export default function StocksPage({ onSelectStock }) {
       {/* Stock Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 gap-6 w-full">
         {filteredAndSortedStocks.map((stock) => (
-          <StockCard
-            key={stock.company}
-            stock={stock}
-            onSelect={onSelectStock}
-          />
+          <StockCard key={stock.company} stock={stock} onSelect={onSelectStock} />
         ))}
       </div>
 

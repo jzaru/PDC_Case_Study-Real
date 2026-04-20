@@ -17,12 +17,17 @@ export default function SettingsPage() {
   const [workers, setWorkers] = useState(8);
   const [graphData, setGraphData] = useState([]);
 
-  // 🔥 NEW: popup state
   const [showPopup, setShowPopup] = useState(false);
+
+  // 🔥 NEW
+  const [trainingTime, setTrainingTime] = useState(0);
+  const [trainingMode, setTrainingMode] = useState("FAST");
 
   useEffect(() => {
     fetchAll();
     fetchWorkers();
+    fetchMLStats();
+    fetchTrainingMode(); // 🔥 NEW
   }, []);
 
   const fetchAll = async () => {
@@ -40,6 +45,37 @@ export default function SettingsPage() {
     const data = await performanceApi.getWorkers();
     setWorkers(data.workers);
   };
+
+  // 🔥 NEW FUNCTION
+  const fetchMLStats = async () => {
+      try {
+        const data = await performanceApi.getMLStats();
+        setTrainingTime(data.training_time ?? 0);
+      } catch (err) {
+        console.error('ML stats error:', err);
+      }
+    };
+
+    const fetchTrainingMode = async () => {
+    try {
+      const data = await performanceApi.getTrainingMode();
+      setTrainingMode(data.mode);
+      setTrainingTime(data.training_time);
+    } catch (err) {
+      console.error('Training mode error:', err);
+    }
+  };
+
+  const setMode = async (mode) => {
+    const res = await performanceApi.setTrainingMode(mode);
+
+    setTrainingMode(res.mode);
+    setTrainingTime(res.training_time);
+
+    setShowPopup(true);
+    setTimeout(() => setShowPopup(false), 2000);
+  };
+
 
   // ========================
   // PERFORMANCE
@@ -81,7 +117,6 @@ export default function SettingsPage() {
     setGraphData(results);
   };
 
-  // 🔥 UPDATED APPLY WORKERS (WITH POPUP)
   const applyWorkers = async () => {
     await performanceApi.setWorkers(Number(workers));
     await runPerformanceTest();
@@ -198,6 +233,36 @@ export default function SettingsPage() {
 
           <h2 className="text-xl mb-4">⚡ Parallel Performance</h2>
 
+
+          {/* 🔥 TRAINING MODE */}
+          <div className="mb-4">
+            <p className="mb-2">🧠 Training Mode</p>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => setMode("FAST")}
+                className={`px-4 py-2 rounded-lg transition ${
+                  trainingMode === "FAST"
+                    ? "bg-green-500 scale-105"
+                    : "bg-gray-600 hover:scale-105"
+                }`}
+              >
+                FAST ⚡
+              </button>
+
+              <button
+                onClick={() => setMode("FULL")}
+                className={`px-4 py-2 rounded-lg transition ${
+                  trainingMode === "FULL"
+                    ? "bg-purple-500 scale-105"
+                    : "bg-gray-600 hover:scale-105"
+                }`}
+              >
+                FULL 🧠
+              </button>
+            </div>
+          </div>      
+
           {/* WORKER CONTROL UI */}
           <div className="mb-4">
 
@@ -237,6 +302,10 @@ export default function SettingsPage() {
             <p>📊 Confidence: <span className="text-green-400">{avgConfidence}%</span></p>
             <p>⏱ Time: <span className="text-blue-400">{computationTime} ms</span></p>
             <p>📈 Stocks: <span className="text-yellow-400">{stocksProcessed}</span></p>
+
+            {/* 🔥 NEW LINE */}
+            <p>🧠 Training Time: <span className="text-purple-400">{trainingTime}s</span></p>
+            <p>⚙ Mode: <span className="text-blue-400">{trainingMode}</span></p>
           </div>
 
           <button
@@ -272,7 +341,7 @@ export default function SettingsPage() {
 
       </div>
 
-      {/* 🔥 POPUP */}
+      {/* POPUP */}
       {showPopup && (
         <div className="fixed bottom-6 right-6 bg-green-500 text-white px-6 py-3 rounded-xl shadow-lg animate-bounce">
           ✅ {workers} Workers Applied

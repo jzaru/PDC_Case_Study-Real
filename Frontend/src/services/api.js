@@ -56,13 +56,11 @@ export const portfolioApi = {
     return response.data;
   },
 
-  // 🔥 FIXED: accepts object payload
   buyStock: async (payload) => {
     const response = await apiClient.post('/buy', payload);
     return response.data;
   },
 
-  // 🔥 FIXED: accepts object payload
   sellStock: async (payload) => {
     const response = await apiClient.post('/sell', payload);
     return response.data;
@@ -110,7 +108,7 @@ export const simulationApi = {
 };
 
 // ========================
-// 🔥 NEW: PERFORMANCE / WORKERS (PDC)
+// 🔥 PERFORMANCE / WORKERS (PDC)
 // ========================
 export const performanceApi = {
   setWorkers: async (workers) => {
@@ -120,6 +118,25 @@ export const performanceApi = {
 
   getWorkers: async () => {
     const response = await apiClient.get('/workers');
+    return response.data;
+  },
+
+  // 🔥 ML TRAINING TIME
+  getMLStats: async () => {
+    const response = await apiClient.get('/ml-stats');
+    return response.data;
+  },
+
+  // ========================
+  // 🔥 NEW: TRAINING MODE
+  // ========================
+  setTrainingMode: async (mode) => {
+    const response = await apiClient.post('/training-mode', { mode });
+    return response.data;
+  },
+
+  getTrainingMode: async () => {
+    const response = await apiClient.get('/training-mode');
     return response.data;
   },
 };

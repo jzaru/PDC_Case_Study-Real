@@ -1,4 +1,4 @@
-"""HIGH-PERFORMANCE stock trading API routes (FIXED SELL ALL + VALIDATION + WORKER CONTROL)"""
+"""HIGH-PERFORMANCE stock trading API routes (FIXED PERFORMANCE BOTTLENECK)"""
 
 from fastapi import APIRouter, HTTPException
 from services.stock_service import StockService
@@ -65,8 +65,8 @@ async def get_stock_history(company: str):
     sim = portfolio_svc.get_simulation_status()
     index = sim.get("current_index") if sim.get("running") else None
 
-    data = stock_svc.get_all_stocks(index=index)
-    stock_data = next((s for s in data if s["company"] == company), None)
+    # 🔥 FIX: DO NOT RECOMPUTE ALL STOCKS
+    stock_data = stock_svc.get_single_stock(company, index=index)
 
     return {
         "company": company,
@@ -78,7 +78,7 @@ async def get_stock_history(company: str):
 
 
 # ========================
-# 🔥 FIXED TRADING
+# BUY
 # ========================
 @router.post("/buy")
 async def buy_stock(request: dict):
@@ -102,6 +102,9 @@ async def buy_stock(request: dict):
     return portfolio_svc.buy_stock(company, quantity)
 
 
+# ========================
+# SELL
+# ========================
 @router.post("/sell")
 async def sell_stock(request: dict):
     if not portfolio_svc:
@@ -125,7 +128,7 @@ async def sell_stock(request: dict):
 
 
 # ========================
-# 🔥 NEW: WORKER CONTROL (PDC)
+# WORKERS
 # ========================
 @router.post("/workers")
 async def set_workers(request: dict):
@@ -155,6 +158,40 @@ async def get_workers():
     return {
         "workers": stock_svc.get_workers()
     }
+
+
+# ========================
+# ML STATS
+# ========================
+@router.get("/ml-stats")
+async def get_ml_stats():
+    if not stock_svc:
+        raise HTTPException(status_code=500, detail="Stock service not initialized")
+
+    return {
+        "training_time": stock_svc.model.get_training_time()
+    }
+
+
+# ========================
+# TRAINING MODE
+# ========================
+@router.post("/training-mode")
+async def set_training_mode(request: dict):
+    if not stock_svc:
+        raise HTTPException(status_code=500, detail="Stock service not initialized")
+
+    mode = request.get("mode", "FAST")
+
+    return stock_svc.set_training_mode(mode)
+
+
+@router.get("/training-mode")
+async def get_training_mode():
+    if not stock_svc:
+        raise HTTPException(status_code=500, detail="Stock service not initialized")
+
+    return stock_svc.get_training_mode()
 
 
 # ========================
@@ -215,22 +252,16 @@ async def subtract_balance(request: dict):
 # ========================
 @router.post("/simulation/start")
 async def start_simulation():
-    if not portfolio_svc:
-        raise HTTPException(status_code=500, detail="Services not initialized")
     return portfolio_svc.start_simulation()
 
 
 @router.post("/simulation/stop")
 async def stop_simulation():
-    if not portfolio_svc:
-        raise HTTPException(status_code=500, detail="Services not initialized")
     return portfolio_svc.stop_simulation()
 
 
 @router.get("/simulation/status")
 async def get_simulation_status():
-    if not portfolio_svc:
-        raise HTTPException(status_code=500, detail="Services not initialized")
     return portfolio_svc.get_simulation_status()
 
 
@@ -239,6 +270,4 @@ async def get_simulation_status():
 # ========================
 @router.get("/transactions")
 async def get_transactions():
-    if not transaction_svc:
-        raise HTTPException(status_code=500, detail="Services not initialized")
     return {"transactions": transaction_svc.get_transactions()}
